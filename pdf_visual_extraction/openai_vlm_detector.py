@@ -8,6 +8,7 @@ import argparse
 import os
 import base64
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List, Any
 from openai import OpenAI
 
@@ -150,8 +151,39 @@ def detect_tables_figures_openai(image_path: str, client: OpenAI) -> Dict[str, A
             "elements": []
         }
 
-def process_images_openai(images_dir: str, pdf_name: str, output_file: str, max_pages: int = 10) -> Dict[str, Any]:
-    """Process images using OpenAI VLM"""
+def process_single_image(args_tuple) -> tuple:
+    """Process a single image - designed for concurrent execution"""
+    page_num, image_path, client = args_tuple
+    
+    try:
+        print(f"Processing page {page_num + 1}: {os.path.basename(image_path)}")
+        
+        # Detect tables and figures
+        detection_result = detect_tables_figures_openai(image_path, client)
+        
+        # Count elements
+        elements = detection_result.get('elements', [])
+        
+        # Create page result
+        page_result = {
+            "page_number": page_num,
+            "image_path": image_path,
+            "image_filename": os.path.basename(image_path),
+            "detection_result": detection_result,
+            "raw_response": "",
+            "processing_timestamp": str(time.time())
+        }
+        
+        print(f"Found {len(elements)} elements on page {page_num + 1}")
+        
+        return page_num, page_result, len(elements), None
+        
+    except Exception as e:
+        print(f"Error processing page {page_num + 1}: {e}")
+        return page_num, None, 0, str(e)
+
+def process_images_openai(images_dir: str, pdf_name: str, output_file: str, max_pages: int = 10, max_workers: int = 5) -> Dict[str, Any]:
+    """Process images using OpenAI VLM with concurrent processing"""
     
     # Initialize OpenAI client
     client = OpenAI()
@@ -167,7 +199,7 @@ def process_images_openai(images_dir: str, pdf_name: str, output_file: str, max_
         print("No images found!")
         return {}
     
-    print(f"Processing {len(image_files)} images...")
+    print(f"Processing {len(image_files)} images with {max_workers} concurrent workers...")
     
     results = {
         "pdf_name": pdf_name,
@@ -178,29 +210,39 @@ def process_images_openai(images_dir: str, pdf_name: str, output_file: str, max_
         "pages": []
     }
     
-    for i, (page_num, image_path) in enumerate(image_files):
-        print(f"Processing page {i+1}/{len(image_files)}: {os.path.basename(image_path)}")
+    # Prepare arguments for concurrent processing
+    # Note: We need to create a new client for each thread to avoid issues
+    def create_client():
+        return OpenAI()
+    
+    # Process images concurrently
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit all tasks
+        future_to_page = {}
+        for page_num, image_path in image_files:
+            # Create a new client for each task
+            task_client = create_client()
+            future = executor.submit(process_single_image, (page_num, image_path, task_client))
+            future_to_page[future] = page_num
         
-        # Detect tables and figures
-        detection_result = detect_tables_figures_openai(image_path, client)
-        
-        # Count elements
-        elements = detection_result.get('elements', [])
-        results['total_elements'] += len(elements)
-        
-        # Add page result
-        page_result = {
-            "page_number": page_num,
-            "image_path": image_path,
-            "image_filename": os.path.basename(image_path),
-            "detection_result": detection_result,
-            "raw_response": "",
-            "processing_timestamp": str(time.time())
-        }
-        
-        results['pages'].append(page_result)
-        
-        print(f"Found {len(elements)} elements on page {page_num + 1}")
+        # Collect results as they complete
+        for future in as_completed(future_to_page):
+            page_num, page_result, element_count, error = future.result()
+            
+            if error:
+                results['errors'] += 1
+                print(f"Error processing page {page_num + 1}: {error}")
+            else:
+                results['pages'].append(page_result)
+                results['total_elements'] += element_count
+    
+    # Sort pages by page number to maintain order
+    results['pages'].sort(key=lambda x: x['page_number'])
+    
+    print(f"Concurrent processing completed!")
+    print(f"Total pages: {results['total_pages']}")
+    print(f"Total elements: {results['total_elements']}")
+    print(f"Errors: {results['errors']}")
     
     return results
 

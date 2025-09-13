@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 from typing import List
 
-def convert_pdf_to_images(pdf_path: str, output_dir: str, dpi: int = 300) -> List[str]:
+def convert_pdf_to_images(pdf_path: str, output_dir: str, dpi: int = 300, max_pages: int = None) -> List[str]:
     """
     Convert PDF pages to images
     
@@ -18,6 +18,7 @@ def convert_pdf_to_images(pdf_path: str, output_dir: str, dpi: int = 300) -> Lis
         pdf_path: Path to the PDF file
         output_dir: Directory to save images
         dpi: DPI for image conversion
+        max_pages: Maximum number of pages to convert (None for all pages)
         
     Returns:
         List of generated image file paths
@@ -28,11 +29,16 @@ def convert_pdf_to_images(pdf_path: str, output_dir: str, dpi: int = 300) -> Lis
         
         # Convert PDF to images without output_folder to avoid temp files
         print(f"Converting PDF to images with DPI: {dpi}")
+        if max_pages:
+            print(f"Limiting to first {max_pages} pages")
+        
         images = pdf2image.convert_from_path(
             pdf_path,
             dpi=dpi,
             fmt='png',
-            thread_count=4
+            thread_count=4,
+            first_page=1,
+            last_page=max_pages
         )
         
         # Generate image file paths
