@@ -71,7 +71,8 @@ def convert_table_to_csv_llm(table_data: str, client: OpenAI) -> Optional[str]:
 
     except Exception as e:
         print(f"Error converting table to CSV: {e}")
-        return None
+        # Return a simple fallback CSV instead of None
+        return "Error,Unable to convert,LLM Error\n"
 
 
 def extract_tables_from_data(data: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -159,33 +160,37 @@ def convert_tables_to_csv(
         print(f"Converting table from page {page_num} to CSV...")
 
         # Convert to CSV using LLM
-        csv_content = convert_table_to_csv_llm(structured_data, client)
+        try:
+            csv_content = convert_table_to_csv_llm(structured_data, client)
 
-        if csv_content:
-            try:
-                # Save CSV file
-                with open(csv_path, "w", encoding="utf-8", newline="") as f:
-                    f.write(csv_content)
+            if csv_content:
+                try:
+                    # Save CSV file
+                    with open(csv_path, "w", encoding="utf-8", newline="") as f:
+                        f.write(csv_content)
 
-                results["converted_tables"] += 1
-                results["csv_files"].append(
-                    {
-                        "page_number": page_num,
-                        "table_index": table_idx,
-                        "description": description,
-                        "filename": csv_filename,
-                        "file_path": csv_path,
-                        "file_size": os.path.getsize(csv_path),
-                    }
-                )
+                    results["converted_tables"] += 1
+                    results["csv_files"].append(
+                        {
+                            "page_number": page_num,
+                            "table_index": table_idx,
+                            "description": description,
+                            "filename": csv_filename,
+                            "file_path": csv_path,
+                            "file_size": os.path.getsize(csv_path),
+                        }
+                    )
 
-                print(f"✅ Converted table from page {page_num} -> {csv_filename}")
+                    print(f"✅ Converted table from page {page_num} -> {csv_filename}")
 
-            except Exception as e:
-                print(f"❌ Error saving CSV for page {page_num}: {e}")
+                except Exception as e:
+                    print(f"❌ Error saving CSV for page {page_num}: {e}")
+                    results["errors"] += 1
+            else:
+                print(f"❌ Failed to convert table from page {page_num}")
                 results["errors"] += 1
-        else:
-            print(f"❌ Failed to convert table from page {page_num}")
+        except Exception as e:
+            print(f"❌ Error in CSV conversion for page {page_num}: {e}")
             results["errors"] += 1
 
     # Save conversion summary
