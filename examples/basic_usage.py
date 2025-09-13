@@ -10,7 +10,8 @@ from pdf_visual_extraction import (
     convert_pdf_to_images,
     process_images_openai,
     inject_tables_into_text,
-    convert_json_to_markdown
+    convert_json_to_markdown,
+    convert_tables_to_csv
 )
 
 def main():
@@ -67,7 +68,12 @@ def main():
     with open(final_file, 'w') as f:
         json.dump(final_data, f, indent=2)
     
-    # Step 5: Convert to Markdown
+    # Step 5: Convert tables to CSV
+    print("📈 Converting tables to CSV...")
+    csv_results = convert_tables_to_csv(final_data, output_dir, pdf_name)
+    print(f"   Converted {csv_results['converted_tables']} out of {csv_results['total_tables']} tables")
+    
+    # Step 6: Convert to Markdown
     print("📝 Converting to Markdown...")
     markdown_file = os.path.join(output_dir, "report.md")
     markdown_content = convert_json_to_markdown(final_data)
@@ -78,6 +84,7 @@ def main():
     print(f"📁 Results saved to: {output_dir}")
     print(f"📊 Final JSON: {final_file}")
     print(f"📝 Markdown: {markdown_file}")
+    print(f"📈 CSV files: {os.path.join(output_dir, 'csv_exports')}")
 
 if __name__ == "__main__":
     main()

@@ -45,6 +45,9 @@ pdf-visual-extract --pdf_path document.pdf --output_dir ./output --export_csv
 
 # Full pipeline with all exports
 pdf-visual-extract --pdf_path document.pdf --output_dir ./output --export_md --export_csv --max_pages 5
+
+# Batch processing multiple PDFs
+python examples/batch_processing_example.py
 ```
 
 ### Python API Usage
@@ -74,6 +77,39 @@ final_data = inject_tables_into_text(text_data, visual_data)
 csv_results = convert_tables_to_csv(final_data, "output", "document")
 ```
 
+## Batch Processing
+
+For processing multiple PDFs efficiently:
+
+### Command Line:
+```bash
+# Process all PDFs in a directory with parallel processing
+python batch_process_all_pdfs.py --data_dir data --output_dir batch_output --parallel_jobs 4 --max_workers 3
+```
+
+### Python API:
+```python
+from pdf_visual_extraction import run_pdf_visual_extraction
+
+# Process multiple PDFs
+pdf_files = ["doc1.pdf", "doc2.pdf", "doc3.pdf"]
+for pdf_path in pdf_files:
+    success = run_pdf_visual_extraction(
+        pdf_path=pdf_path,
+        output_dir="batch_output",
+        export_md=True,
+        export_csv=True,
+        max_workers=3
+    )
+```
+
+### Features:
+- **Parallel processing** for multiple PDFs
+- **CSV export** for all extracted tables
+- **Progress tracking** and error handling
+- **Comprehensive summaries** with statistics
+- **Skip existing** files option
+
 ## Configuration
 
 ### Environment Variables
@@ -89,6 +125,35 @@ export OPENAI_API_KEY="your-api-key-here"
 ```python
 import os
 os.environ["OPENAI_API_KEY"] = "your-api-key-here"
+```
+
+## CSV Export
+
+The library can convert extracted tables to CSV format using LLM:
+
+### Features:
+- **LLM-powered conversion** using GPT-4o-mini
+- **Clean CSV formatting** with proper headers
+- **Data type preservation** (numbers, text, percentages)
+- **Hierarchical structure** handling
+- **Descriptive filenames** with page numbers and table descriptions
+
+### Usage:
+```python
+from pdf_visual_extraction import convert_tables_to_csv
+
+# Convert all tables to CSV
+csv_results = convert_tables_to_csv(final_data, "output", "document")
+print(f"Converted {csv_results['converted_tables']} tables to CSV")
+```
+
+### Output Structure:
+```
+output/
+├── csv_exports/
+│   ├── document_page_001_Financial_Results.csv
+│   ├── document_page_002_Revenue_Breakdown.csv
+│   └── document_csv_conversion_summary.json
 ```
 
 ## Output Format
