@@ -19,6 +19,7 @@ from pdf_visual_extraction.pdf_to_images import convert_pdf_to_images
 from pdf_visual_extraction.openai_vlm_detector import process_images_openai
 from pdf_visual_extraction.simple_table_injector import inject_tables_into_text, extract_tables_from_visual
 from pdf_visual_extraction.json_to_markdown import convert_json_to_markdown
+from pdf_visual_extraction.table_csv_converter import convert_tables_to_csv
 
 def check_existing_files(dirs: dict, pdf_name: str, export_md: bool, force: bool) -> dict:
     """Check which processing steps can be skipped based on existing files"""
@@ -66,7 +67,7 @@ def check_existing_files(dirs: dict, pdf_name: str, export_md: bool, force: bool
     return skip_steps
 
 def run_pdf_visual_extraction(pdf_path: str, output_dir: str, max_pages: int = 10, 
-                             export_md: bool = False, force: bool = False, max_workers: int = 5) -> bool:
+                             export_md: bool = False, export_csv: bool = False, force: bool = False, max_workers: int = 5) -> bool:
     """
     Run the complete PDF visual extraction pipeline
     
@@ -75,6 +76,7 @@ def run_pdf_visual_extraction(pdf_path: str, output_dir: str, max_pages: int = 1
         output_dir: Output directory for all results
         max_pages: Maximum number of pages to process
         export_md: Whether to export to Markdown
+        export_csv: Whether to export tables to CSV format
         force: Whether to force reprocessing even if files exist
         max_workers: Maximum number of concurrent workers for VLM processing
         
@@ -214,7 +216,56 @@ def run_pdf_visual_extraction(pdf_path: str, output_dir: str, max_pages: int = 1
             print(f"✅ Table injection completed!")
             print(f"   Final result saved to: {final_output}")
         
-        # Step 5: Export to Markdown (if requested)
+        # Step 5: Convert Tables to CSV (if requested)
+        csv_results = None
+        if export_csv:
+            print("\n" + "="*60)
+            print("STEP: Table CSV Conversion")
+            print("="*60)
+            
+            csv_output_dir = dirs['exports']
+            csv_summary_file = os.path.join(csv_output_dir, f"{pdf_name}_csv_conversion_summary.json")
+            
+            if os.path.exists(csv_summary_file) and not force:
+                print("⏭️  Skipping CSV conversion (files exist)")
+                with open(csv_summary_file, 'r', encoding='utf-8') as f:
+                    csv_results = json.load(f)
+            elif not os.getenv('OPENAI_API_KEY'):
+                print("⚠️  Skipping CSV conversion (no OpenAI API key)")
+                print("   Set OPENAI_API_KEY to enable table CSV conversion")
+                
+                # Create empty CSV results
+                csv_results = {
+                    'pdf_name': pdf_name,
+                    'total_tables': 0,
+                    'converted_tables': 0,
+                    'csv_files': [],
+                    'errors': 0
+                }
+                
+                # Save empty CSV results
+                with open(csv_summary_file, 'w', encoding='utf-8') as f:
+                    json.dump(csv_results, f, indent=2, ensure_ascii=False)
+                
+                print(f"✅ CSV conversion skipped (no API key)")
+                print(f"   Created empty CSV results: {csv_summary_file}")
+            else:
+                print(f"Converting tables to CSV format...")
+                
+                # Convert tables to CSV
+                csv_results = convert_tables_to_csv(final_data, csv_output_dir, pdf_name)
+                
+                print(f"✅ CSV conversion completed!")
+                print(f"   Converted {csv_results['converted_tables']} out of {csv_results['total_tables']} tables")
+                print(f"   CSV files saved to: {os.path.join(csv_output_dir, 'csv_exports')}")
+        else:
+            print("\n" + "="*60)
+            print("STEP: Table CSV Conversion")
+            print("="*60)
+            print("⏭️  Skipping CSV conversion (not requested)")
+            print("   Use --export_csv to enable table CSV conversion")
+        
+        # Step 6: Export to Markdown (if requested)
         if export_md:
             print("\n" + "="*60)
             print("STEP: Markdown Export")
@@ -244,7 +295,7 @@ def run_pdf_visual_extraction(pdf_path: str, output_dir: str, max_pages: int = 1
         
         summary_report = os.path.join(dirs['base'], f"{pdf_name}_pipeline_summary.md")
         create_summary_report(pdf_name, text_data, visual_data, final_data, 
-                            dirs, export_md, summary_report)
+                            dirs, export_md, summary_report, csv_results)
         
         print(f"✅ Summary report generated!")
         print(f"   Saved to: {summary_report}")
@@ -266,7 +317,7 @@ def run_pdf_visual_extraction(pdf_path: str, output_dir: str, max_pages: int = 1
 
 def create_summary_report(pdf_name: str, text_data: dict, visual_data: dict, 
                          final_data: dict, dirs: dict, export_md: bool, 
-                         summary_file: str) -> None:
+                         summary_file: str, csv_results: dict = None) -> None:
     """Create a comprehensive summary report"""
     
     # Count elements by type
@@ -289,7 +340,14 @@ def create_summary_report(pdf_name: str, text_data: dict, visual_data: dict,
         f.write(f"- **Total Pages**: {text_data.get('total_pages', 0)}\n")
         f.write(f"- **Total Characters**: {len(text_data.get('full_text', ''))}\n")
         f.write(f"- **Visual Elements Found**: {total_elements}\n")
-        f.write(f"- **Element Types**: {element_counts}\n\n")
+        f.write(f"- **Element Types**: {element_counts}\n")
+        
+        # Add CSV conversion results if available
+        if csv_results:
+            f.write(f"- **Tables Converted to CSV**: {csv_results.get('converted_tables', 0)}/{csv_results.get('total_tables', 0)}\n")
+            f.write(f"- **CSV Conversion Errors**: {csv_results.get('errors', 0)}\n")
+        
+        f.write("\n")
         
         f.write("## Generated Files\n\n")
         f.write("### Text Extraction\n")
@@ -301,6 +359,15 @@ def create_summary_report(pdf_name: str, text_data: dict, visual_data: dict,
         
         f.write("### Visual Detection\n")
         f.write(f"- `{dirs['visual']}/{pdf_name}_tables_figures.json`\n\n")
+        
+        # Add CSV exports section if available
+        if csv_results and csv_results.get('csv_files'):
+            f.write("### CSV Exports\n")
+            f.write(f"- `{dirs['exports']}/csv_exports/` (CSV files)\n")
+            f.write(f"- `{dirs['exports']}/{pdf_name}_csv_conversion_summary.json` (CSV conversion summary)\n")
+            for csv_file in csv_results['csv_files']:
+                f.write(f"  - `{csv_file['filename']}` (Page {csv_file['page_number']}: {csv_file['description']})\n")
+            f.write("\n")
         
         if export_md:
             f.write("### Exports\n")
@@ -320,6 +387,9 @@ def create_summary_report(pdf_name: str, text_data: dict, visual_data: dict,
         f.write("3. ✅ OpenAI VLM Table/Figure Detection\n")
         f.write("4. ✅ Table Injection\n")
         step_num = 5
+        if csv_results is not None:
+            f.write(f"{step_num}. ✅ Table CSV Conversion\n")
+            step_num += 1
         if export_md:
             f.write(f"{step_num}. ✅ Markdown Export\n")
             step_num += 1
@@ -331,6 +401,7 @@ def main():
     parser.add_argument('--output_dir', required=True, help='Output directory for all results')
     parser.add_argument('--max_pages', type=int, default=10, help='Maximum pages to process')
     parser.add_argument('--export_md', action='store_true', help='Export to Markdown format')
+    parser.add_argument('--export_csv', action='store_true', help='Export tables to CSV format (requires OpenAI API key)')
     parser.add_argument('--force', action='store_true', help='Force reprocessing even if output files exist')
     parser.add_argument('--max_workers', type=int, default=5, help='Maximum concurrent workers for VLM processing')
     
@@ -352,6 +423,7 @@ def main():
         args.output_dir, 
         args.max_pages,
         args.export_md,
+        args.export_csv,
         args.force,
         args.max_workers
     )

@@ -8,7 +8,8 @@ A Python library for extracting text and visual elements (tables, figures) from 
 - **🖼️ PDF to Images**: Convert PDF pages to high-quality images
 - **🔍 Visual Element Detection**: Use OpenAI's GPT-4o-mini to detect and extract tables and figures
 - **📊 Structured Data Extraction**: Extract tables in structured list format with all numerical data
-- **📝 Multiple Export Formats**: Export to JSON, Markdown, and PDF
+- **📈 CSV Export**: Convert extracted tables to CSV format using LLM
+- **📝 Multiple Export Formats**: Export to JSON, Markdown, and CSV
 - **🚀 Simple API**: Easy-to-use command line interface and Python API
 - **💰 Cost-Effective**: Uses GPT-4o-mini for optimal performance and cost
 
@@ -39,11 +40,11 @@ pdf-visual-extract --pdf_path document.pdf --output_dir ./output
 # With markdown export
 pdf-visual-extract --pdf_path document.pdf --output_dir ./output --export_md
 
-# With PDF export
-pdf-visual-extract --pdf_path document.pdf --output_dir ./output --export_pdf
+# With CSV export
+pdf-visual-extract --pdf_path document.pdf --output_dir ./output --export_csv
 
 # Full pipeline with all exports
-pdf-visual-extract --pdf_path document.pdf --output_dir ./output --export_md --export_pdf --max_pages 5
+pdf-visual-extract --pdf_path document.pdf --output_dir ./output --export_md --export_csv --max_pages 5
 ```
 
 ### Python API Usage
@@ -53,7 +54,8 @@ from pdf_visual_extraction import (
     extract_text_from_pdf,
     convert_pdf_to_images,
     process_images_openai,
-    inject_tables_into_text
+    inject_tables_into_text,
+    convert_tables_to_csv
 )
 
 # Extract text
@@ -67,6 +69,9 @@ visual_data = process_images_openai("output/images/", "document", "output/visual
 
 # Inject tables into text
 final_data = inject_tables_into_text(text_data, visual_data)
+
+# Convert tables to CSV
+csv_results = convert_tables_to_csv(final_data, "output", "document")
 ```
 
 ## Configuration
