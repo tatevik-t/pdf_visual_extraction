@@ -67,8 +67,8 @@ def check_existing_files(dirs: dict, pdf_name: str, export_md: bool, force: bool
     
     return skip_steps
 
-def run_pdf_visual_extraction(pdf_path: str, output_dir: str, max_pages: int = 10, 
-                             export_md: bool = False, export_csv: bool = False, clean_text: bool = False, 
+def run_pdf_visual_extraction(pdf_path: str, output_dir: str="./data/csv_exports", max_pages: int = 1000000, 
+                             export_md: bool = False, export_csv: bool = True, clean_text: bool = False, 
                              force: bool = False, max_workers: int = 5) -> bool:
     """
     Run the complete PDF visual extraction pipeline
@@ -218,7 +218,7 @@ def run_pdf_visual_extraction(pdf_path: str, output_dir: str, max_pages: int = 1
             
             print(f"✅ Table injection completed!")
             print(f"   Final result saved to: {final_output}")
-        
+        final_data_text_cleaned = final_data
         # Step 5: Clean Text (remove redundant table/figure content)
         if clean_text:
             print("\n" + "="*60)
@@ -236,11 +236,11 @@ def run_pdf_visual_extraction(pdf_path: str, output_dir: str, max_pages: int = 1
                 client = OpenAI()
                 
                 # Clean the text
-                final_data = clean_text_in_data(final_data, client)
+                final_data_text_cleaned = clean_text_in_data(final_data, client)
                 
                 # Save the cleaned result
                 with open(final_output, 'w', encoding='utf-8') as f:
-                    json.dump(final_data, f, indent=2, ensure_ascii=False)
+                    json.dump(final_data_text_cleaned, f, indent=2, ensure_ascii=False)
                 
                 print(f"✅ Text cleaning completed!")
                 print(f"   Cleaned result saved to: {final_output}")
@@ -249,6 +249,7 @@ def run_pdf_visual_extraction(pdf_path: str, output_dir: str, max_pages: int = 1
         
         # Step 6: Convert Tables to CSV (if requested)
         csv_results = None
+        tables_dfs = []
         if export_csv:
             print("\n" + "="*60)
             print("STEP: Table CSV Conversion")
@@ -284,7 +285,7 @@ def run_pdf_visual_extraction(pdf_path: str, output_dir: str, max_pages: int = 1
                 print(f"Converting tables to CSV format...")
                 
                 # Convert tables to CSV
-                csv_results = convert_tables_to_csv(final_data, csv_output_dir, pdf_name)
+                csv_results, tables_dfs = convert_tables_to_csv(final_data, csv_output_dir, pdf_name)
                 
                 print(f"✅ CSV conversion completed!")
                 print(f"   Converted {csv_results['converted_tables']} out of {csv_results['total_tables']} tables")
@@ -323,28 +324,20 @@ def run_pdf_visual_extraction(pdf_path: str, output_dir: str, max_pages: int = 1
         print("\n" + "="*60)
         print("STEP: Summary Report Generation")
         print("="*60)
-        
-        summary_report = os.path.join(dirs['base'], f"{pdf_name}_pipeline_summary.md")
-        create_summary_report(pdf_name, text_data, visual_data, final_data, 
-                            dirs, export_md, summary_report, csv_results)
-        
-        print(f"✅ Summary report generated!")
-        print(f"   Saved to: {summary_report}")
-        
+
         print("\n" + "="*60)
         print("🎉 PDF VISUAL EXTRACTION PIPELINE COMPLETED SUCCESSFULLY!")
         print("="*60)
         print(f"📁 All outputs saved to: {dirs['base']}")
         print(f"📊 Final result: {final_output}")
-        print(f"📋 Summary report: {summary_report}")
-        
-        return True
+
+        return final_data_text_cleaned, tables_dfs
         
     except Exception as e:
         print(f"\n❌ Pipeline failed with error: {e}")
         import traceback
         traceback.print_exc()
-        return False
+        return False, False
 
 def create_summary_report(pdf_name: str, text_data: dict, visual_data: dict, 
                          final_data: dict, dirs: dict, export_md: bool, 

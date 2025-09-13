@@ -11,8 +11,9 @@ from pathlib import Path
 
 # Add the current directory to Python path
 sys.path.append('.')
+sys.path.append('pdf_visual_extraction')
 
-from pdf_visual_extraction import run_pdf_visual_extraction
+from pdf_visual_extraction.pdf_visual_extract import run_pdf_visual_extraction
 
 def process_single_pdf(pdf_path: str, output_dir: str, max_pages: int = None) -> dict:
     """Process a single PDF and return results"""
@@ -23,34 +24,12 @@ def process_single_pdf(pdf_path: str, output_dir: str, max_pages: int = None) ->
     print(f"📄 Processing: {pdf_name}")
     
     try:
-        success = run_pdf_visual_extraction(
+        markdown, paths = run_pdf_visual_extraction(
             pdf_path=pdf_path,
-            output_dir=output_dir,
-            max_pages=max_pages,
-            export_md=True,
-            export_csv=True,  # Enable CSV export
-            force=False,
-            max_workers=3
         )
         
         processing_time = time.time() - start_time
-        
-        if success:
-            print(f"✅ {pdf_name} completed in {processing_time:.1f}s")
-            return {
-                'pdf_name': pdf_name,
-                'status': 'success',
-                'processing_time': processing_time,
-                'error': None
-            }
-        else:
-            print(f"❌ {pdf_name} failed")
-            return {
-                'pdf_name': pdf_name,
-                'status': 'failed',
-                'processing_time': processing_time,
-                'error': 'Processing failed'
-            }
+        print(paths)
             
     except Exception as e:
         processing_time = time.time() - start_time
@@ -66,7 +45,7 @@ def main():
     """Batch processing example"""
     
     # Set your OpenAI API key
-    os.environ["OPENAI_API_KEY"] = "your-api-key-here"
+    os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
     
     # Configuration
     data_dir = "data"  # Directory containing PDF files
@@ -97,7 +76,7 @@ def main():
     results = []
     start_time = time.time()
     
-    for i, pdf_path in enumerate(pdf_files, 1):
+    for i, pdf_path in enumerate(pdf_files[:2], 1):
         print(f"[{i}/{len(pdf_files)}] ", end="")
         result = process_single_pdf(pdf_path, output_dir, max_pages)
         results.append(result)
@@ -108,7 +87,7 @@ def main():
     
     # Summary
     total_time = time.time() - start_time
-    successful = len([r for r in results if r['status'] == 'success'])
+    successful = 0
     
     print("\n" + "=" * 50)
     print("📊 BATCH PROCESSING SUMMARY")

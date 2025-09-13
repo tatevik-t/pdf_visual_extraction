@@ -99,7 +99,7 @@ def extract_tables_from_data(data: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 
 def convert_tables_to_csv(
-    data: Dict[str, Any], output_dir: str, pdf_name: str
+    data: Dict[str, Any], output_dir: str, pdf_name: str, save_csv: bool = True
 ) -> Dict[str, Any]:
     """Convert all extracted tables to CSV format"""
 
@@ -123,7 +123,7 @@ def convert_tables_to_csv(
             "converted_tables": 0,
             "csv_files": [],
             "errors": 0,
-        }
+        }, []
 
     print(f"Found {len(tables)} tables to convert to CSV")
 
@@ -154,8 +154,9 @@ def convert_tables_to_csv(
         else:
             safe_description = safe_description.replace(" ", "_")[:50]  # Limit length
 
-        csv_filename = f"{pdf_name}_page_{page_num:03d}_{safe_description}.csv"
-        csv_path = os.path.join(csv_dir, csv_filename)
+        if save_csv:
+            csv_filename = f"{pdf_name}_page_{page_num:03d}_{safe_description}.csv"
+            csv_path = os.path.join(csv_dir, csv_filename)
 
         print(f"Converting table from page {page_num} to CSV...")
 
@@ -163,7 +164,7 @@ def convert_tables_to_csv(
         try:
             csv_content = convert_table_to_csv_llm(structured_data, client)
 
-            if csv_content:
+            if csv_content and save_csv:
                 try:
                     # Save CSV file
                     with open(csv_path, "w", encoding="utf-8", newline="") as f:
@@ -187,7 +188,11 @@ def convert_tables_to_csv(
                     print(f"❌ Error saving CSV for page {page_num}: {e}")
                     results["errors"] += 1
             else:
-                print(f"❌ Failed to convert table from page {page_num}")
+                if not save_csv:
+                    print(f"✅ Skipped CSV conversion for page {page_num}")
+                    results["tables_results"].append(csv_content)
+                else:
+                    print(f"❌ Failed to convert table from page {page_num}")
                 results["errors"] += 1
         except Exception as e:
             print(f"❌ Error in CSV conversion for page {page_num}: {e}")
@@ -204,7 +209,7 @@ def convert_tables_to_csv(
     print(f"   Errors: {results['errors']}")
     print(f"   CSV files saved to: {csv_dir}")
 
-    return results
+    return results, [i["filename"] for i in results["csv_files"]]
 
 
 def main():
