@@ -9,13 +9,15 @@ import os
 import base64
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Dict, List, Any
+from typing import Dict, Any
 from openai import OpenAI
+
 
 def encode_image(image_path: str) -> str:
     """Encode image to base64"""
     with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode('utf-8')
+        return base64.b64encode(image_file.read()).decode("utf-8")
+
 
 def create_table_figure_detection_prompt() -> str:
     """Create prompt for table/figure detection"""
@@ -73,15 +75,16 @@ Return your analysis as valid JSON in this format:
   ]
 }"""
 
+
 def detect_tables_figures_openai(image_path: str, client: OpenAI) -> Dict[str, Any]:
     """Detect tables and figures in image using OpenAI VLM"""
     try:
         # Encode image
         base64_image = encode_image(image_path)
-        
+
         # Create prompt
         prompt = create_table_figure_detection_prompt()
-        
+
         # Call OpenAI API
         response = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -94,24 +97,26 @@ def detect_tables_figures_openai(image_path: str, client: OpenAI) -> Dict[str, A
                             "type": "image_url",
                             "image_url": {
                                 "url": f"data:image/png;base64,{base64_image}"
-                            }
-                        }
-                    ]
+                            },
+                        },
+                    ],
                 }
             ],
             max_tokens=4000,
-            temperature=0.1
+            temperature=0.1,
         )
-        
+
         # Parse response
         response_text = response.choices[0].message.content
-        
+        if response_text is None:
+            return {"elements": [], "error": "No response content"}
+
         # Try to extract JSON from response
         try:
             # Look for JSON in the response
-            start_idx = response_text.find('{')
-            end_idx = response_text.rfind('}') + 1
-            
+            start_idx = response_text.find("{")
+            end_idx = response_text.rfind("}") + 1
+
             if start_idx != -1 and end_idx != -1:
                 json_str = response_text[start_idx:end_idx]
                 result = json.loads(json_str)
@@ -123,9 +128,9 @@ def detect_tables_figures_openai(image_path: str, client: OpenAI) -> Dict[str, A
                         "has_tables": False,
                         "has_figures": False,
                         "total_elements": 0,
-                        "page_summary": "No structured data detected"
+                        "page_summary": "No structured data detected",
                     },
-                    "elements": []
+                    "elements": [],
                 }
         except json.JSONDecodeError:
             # Fallback: create basic structure
@@ -134,11 +139,11 @@ def detect_tables_figures_openai(image_path: str, client: OpenAI) -> Dict[str, A
                     "has_tables": False,
                     "has_figures": False,
                     "total_elements": 0,
-                    "page_summary": "JSON parsing failed"
+                    "page_summary": "JSON parsing failed",
                 },
-                "elements": []
+                "elements": [],
             }
-            
+
     except Exception as e:
         print(f"Error processing image {image_path}: {e}")
         return {
@@ -146,24 +151,25 @@ def detect_tables_figures_openai(image_path: str, client: OpenAI) -> Dict[str, A
                 "has_tables": False,
                 "has_figures": False,
                 "total_elements": 0,
-                "page_summary": f"Error: {str(e)}"
+                "page_summary": f"Error: {str(e)}",
             },
-            "elements": []
+            "elements": [],
         }
+
 
 def process_single_image(args_tuple) -> tuple:
     """Process a single image - designed for concurrent execution"""
     page_num, image_path, client = args_tuple
-    
+
     try:
         print(f"Processing page {page_num + 1}: {os.path.basename(image_path)}")
-        
+
         # Detect tables and figures
         detection_result = detect_tables_figures_openai(image_path, client)
-        
+
         # Count elements
-        elements = detection_result.get('elements', [])
-        
+        elements = detection_result.get("elements", [])
+
         # Create page result
         page_result = {
             "page_number": page_num,
@@ -171,50 +177,59 @@ def process_single_image(args_tuple) -> tuple:
             "image_filename": os.path.basename(image_path),
             "detection_result": detection_result,
             "raw_response": "",
-            "processing_timestamp": str(time.time())
+            "processing_timestamp": str(time.time()),
         }
-        
+
         print(f"Found {len(elements)} elements on page {page_num + 1}")
-        
+
         return page_num, page_result, len(elements), None
-        
+
     except Exception as e:
         print(f"Error processing page {page_num + 1}: {e}")
         return page_num, None, 0, str(e)
 
-def process_images_openai(images_dir: str, pdf_name: str, output_file: str, max_pages: int = 10, max_workers: int = 5) -> Dict[str, Any]:
+
+def process_images_openai(
+    images_dir: str,
+    pdf_name: str,
+    output_file: str,
+    max_pages: int = 10,
+    max_workers: int = 5,
+) -> Dict[str, Any]:
     """Process images using OpenAI VLM with concurrent processing"""
-    
+
     # Initialize OpenAI client
-    client = OpenAI()
-    
+    # client = OpenAI()  # Not used in this function
+
     # Get list of image files
     image_files = []
     for i in range(max_pages):
         image_path = os.path.join(images_dir, f"page_{i:03d}.png")
         if os.path.exists(image_path):
             image_files.append((i, image_path))
-    
+
     if not image_files:
         print("No images found!")
         return {}
-    
-    print(f"Processing {len(image_files)} images with {max_workers} concurrent workers...")
-    
-    results = {
+
+    print(
+        f"Processing {len(image_files)} images with {max_workers} concurrent workers..."
+    )
+
+    results: Dict[str, Any] = {
         "pdf_name": pdf_name,
         "images_dir": images_dir,
         "total_pages": len(image_files),
         "total_elements": 0,
         "errors": 0,
-        "pages": []
+        "pages": [],
     }
-    
+
     # Prepare arguments for concurrent processing
     # Note: We need to create a new client for each thread to avoid issues
     def create_client():
         return OpenAI()
-    
+
     # Process images concurrently
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # Submit all tasks
@@ -222,64 +237,74 @@ def process_images_openai(images_dir: str, pdf_name: str, output_file: str, max_
         for page_num, image_path in image_files:
             # Create a new client for each task
             task_client = create_client()
-            future = executor.submit(process_single_image, (page_num, image_path, task_client))
+            future = executor.submit(
+                process_single_image, (page_num, image_path, task_client)
+            )
             future_to_page[future] = page_num
-        
+
         # Collect results as they complete
         for future in as_completed(future_to_page):
             page_num, page_result, element_count, error = future.result()
-            
+
             if error:
-                results['errors'] += 1
+                results["errors"] += 1
                 print(f"Error processing page {page_num + 1}: {error}")
             else:
-                results['pages'].append(page_result)
-                results['total_elements'] += element_count
-    
+                results["pages"].append(page_result)
+                results["total_elements"] += element_count
+
     # Sort pages by page number to maintain order
-    results['pages'].sort(key=lambda x: x['page_number'])
-    
-    print(f"Concurrent processing completed!")
+    results["pages"].sort(key=lambda x: x["page_number"])
+
+    print("Concurrent processing completed!")
     print(f"Total pages: {results['total_pages']}")
     print(f"Total elements: {results['total_elements']}")
     print(f"Errors: {results['errors']}")
-    
+
     return results
 
+
 def main():
-    parser = argparse.ArgumentParser(description='OpenAI VLM Table/Figure Detection')
-    parser.add_argument('--images_dir', required=True, help='Directory containing page images')
-    parser.add_argument('--pdf_name', required=True, help='Name of the PDF file')
-    parser.add_argument('--output_file', required=True, help='Output JSON file path')
-    parser.add_argument('--max_pages', type=int, default=10, help='Maximum pages to process')
-    
+    parser = argparse.ArgumentParser(description="OpenAI VLM Table/Figure Detection")
+    parser.add_argument(
+        "--images_dir", required=True, help="Directory containing page images"
+    )
+    parser.add_argument("--pdf_name", required=True, help="Name of the PDF file")
+    parser.add_argument("--output_file", required=True, help="Output JSON file path")
+    parser.add_argument(
+        "--max_pages", type=int, default=10, help="Maximum pages to process"
+    )
+
     args = parser.parse_args()
-    
+
     print("OpenAI VLM Table/Figure Detection")
     print(f"Images directory: {args.images_dir}")
     print(f"PDF name: {args.pdf_name}")
     print(f"Output file: {args.output_file}")
     print(f"Max pages: {args.max_pages}")
-    
+
     # Process images
-    results = process_images_openai(args.images_dir, args.pdf_name, args.output_file, args.max_pages)
-    
+    results = process_images_openai(
+        args.images_dir, args.pdf_name, args.output_file, args.max_pages
+    )
+
     if not results:
         print("No results generated!")
         return 1
-    
+
     # Save results
     os.makedirs(os.path.dirname(args.output_file), exist_ok=True)
-    with open(args.output_file, 'w', encoding='utf-8') as f:
+    with open(args.output_file, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
-    
+
     print(f"Results saved to: {args.output_file}")
-    print(f"Processing completed!")
+    print("Processing completed!")
     print(f"Total pages: {results['total_pages']}")
     print(f"Total elements: {results['total_elements']}")
     print(f"Errors: {results['errors']}")
-    
+
     return 0
+
 
 if __name__ == "__main__":
     exit(main())

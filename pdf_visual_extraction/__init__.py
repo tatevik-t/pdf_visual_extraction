@@ -1,7 +1,7 @@
 """
 PDF Visual Extraction Library
 
-A Python library for extracting text and visual elements (tables, figures) 
+A Python library for extracting text and visual elements (tables, figures)
 from PDF documents using OpenAI's vision models.
 
 Main components:
@@ -23,7 +23,7 @@ from .table_csv_converter import convert_tables_to_csv
 
 __all__ = [
     "extract_text_from_pdf",
-    "convert_pdf_to_images", 
+    "convert_pdf_to_images",
     "detect_tables_figures_openai",
     "process_images_openai",
     "inject_tables_into_text",
