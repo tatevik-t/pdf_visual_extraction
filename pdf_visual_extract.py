@@ -14,11 +14,11 @@ from typing import Optional
 # Add the current directory to Python path so we can import the modules
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from pdf_text_extractor import extract_text_from_pdf, save_text_extraction
-from pdf_to_images import convert_pdf_to_images
-from openai_vlm_detector import process_images_openai
-from simple_table_injector import inject_tables_into_text, extract_tables_from_visual
-from json_to_markdown import convert_json_to_markdown
+from pdf_visual_extraction.pdf_text_extractor import extract_text_from_pdf, save_text_extraction
+from pdf_visual_extraction.pdf_to_images import convert_pdf_to_images
+from pdf_visual_extraction.openai_vlm_detector import process_images_openai
+from pdf_visual_extraction.simple_table_injector import inject_tables_into_text, extract_tables_from_visual
+from pdf_visual_extraction.json_to_markdown import convert_json_to_markdown
 
 def check_existing_files(dirs: dict, pdf_name: str, export_md: bool, force: bool) -> dict:
     """Check which processing steps can be skipped based on existing files"""
@@ -66,7 +66,7 @@ def check_existing_files(dirs: dict, pdf_name: str, export_md: bool, force: bool
     return skip_steps
 
 def run_pdf_visual_extraction(pdf_path: str, output_dir: str, max_pages: int = 10, 
-                             export_md: bool = False, force: bool = False) -> bool:
+                             export_md: bool = False, force: bool = False, max_workers: int = 5) -> bool:
     """
     Run the complete PDF visual extraction pipeline
     
@@ -76,6 +76,7 @@ def run_pdf_visual_extraction(pdf_path: str, output_dir: str, max_pages: int = 1
         max_pages: Maximum number of pages to process
         export_md: Whether to export to Markdown
         force: Whether to force reprocessing even if files exist
+        max_workers: Maximum number of concurrent workers for VLM processing
         
     Returns:
         True if successful, False otherwise
@@ -177,7 +178,7 @@ def run_pdf_visual_extraction(pdf_path: str, output_dir: str, max_pages: int = 1
             print(f"   Created empty visual data: {visual_output}")
         else:
             print(f"Detecting tables and figures...")
-            visual_data = process_images_openai(dirs['images'], pdf_name, visual_output, max_pages)
+            visual_data = process_images_openai(dirs['images'], pdf_name, visual_output, max_pages, max_workers)
             
             # Save the visual detection results
             with open(visual_output, 'w', encoding='utf-8') as f:
@@ -331,6 +332,7 @@ def main():
     parser.add_argument('--max_pages', type=int, default=10, help='Maximum pages to process')
     parser.add_argument('--export_md', action='store_true', help='Export to Markdown format')
     parser.add_argument('--force', action='store_true', help='Force reprocessing even if output files exist')
+    parser.add_argument('--max_workers', type=int, default=5, help='Maximum concurrent workers for VLM processing')
     
     args = parser.parse_args()
     
@@ -350,7 +352,8 @@ def main():
         args.output_dir, 
         args.max_pages,
         args.export_md,
-        args.force
+        args.force,
+        args.max_workers
     )
     
     sys.exit(0 if success else 1)

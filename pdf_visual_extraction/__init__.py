@@ -19,7 +19,6 @@ from .pdf_to_images import convert_pdf_to_images
 from .openai_vlm_detector import detect_tables_figures_openai, process_images_openai
 from .simple_table_injector import inject_tables_into_text, extract_tables_from_visual
 from .json_to_markdown import convert_json_to_markdown
-from .markdown_to_pdf import convert_markdown_to_pdf
 
 __all__ = [
     "extract_text_from_pdf",
@@ -29,5 +28,4 @@ __all__ = [
     "inject_tables_into_text",
     "extract_tables_from_visual",
     "convert_json_to_markdown",
-    "convert_markdown_to_pdf",
 ]
