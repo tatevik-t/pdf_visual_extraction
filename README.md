@@ -43,8 +43,11 @@ pdf-visual-extract --pdf_path document.pdf --output_dir ./output --export_md
 # With CSV export
 pdf-visual-extract --pdf_path document.pdf --output_dir ./output --export_csv
 
+# With text cleaning (remove redundant table/figure content)
+pdf-visual-extract --pdf_path document.pdf --output_dir ./output --clean_text
+
 # Full pipeline with all exports
-pdf-visual-extract --pdf_path document.pdf --output_dir ./output --export_md --export_csv --max_pages 5
+pdf-visual-extract --pdf_path document.pdf --output_dir ./output --export_md --export_csv --clean_text --max_pages 5
 
 # Batch processing multiple PDFs
 python examples/batch_processing_example.py
@@ -155,6 +158,33 @@ output/
 │   ├── document_page_002_Revenue_Breakdown.csv
 │   └── document_csv_conversion_summary.json
 ```
+
+## Text Cleaning
+
+The library can intelligently clean extracted text by removing redundant table and figure content that has already been parsed by the VLM:
+
+### Features:
+- **LLM-powered cleaning** using GPT-4o-mini
+- **Intelligent content removal** of redundant table/figure data
+- **Preserves narrative content** and document structure
+- **Maintains references** to tables and figures
+- **Reduces duplication** between text and structured data
+
+### Usage:
+```python
+from pdf_visual_extraction import clean_text_in_data
+from openai import OpenAI
+
+# Clean text to remove redundant content
+client = OpenAI()
+cleaned_data = clean_text_in_data(data, client)
+```
+
+### Benefits:
+- **Cleaner text output** without redundant table data
+- **Better RAG performance** with focused content
+- **Reduced file sizes** by eliminating duplication
+- **Improved readability** of extracted text
 
 ## Output Format
 

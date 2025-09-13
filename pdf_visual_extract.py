@@ -20,6 +20,7 @@ from pdf_visual_extraction.openai_vlm_detector import process_images_openai
 from pdf_visual_extraction.simple_table_injector import inject_tables_into_text, extract_tables_from_visual
 from pdf_visual_extraction.json_to_markdown import convert_json_to_markdown
 from pdf_visual_extraction.table_csv_converter import convert_tables_to_csv
+from pdf_visual_extraction.text_cleaner import clean_text_in_data
 
 def check_existing_files(dirs: dict, pdf_name: str, export_md: bool, force: bool) -> dict:
     """Check which processing steps can be skipped based on existing files"""
@@ -67,7 +68,8 @@ def check_existing_files(dirs: dict, pdf_name: str, export_md: bool, force: bool
     return skip_steps
 
 def run_pdf_visual_extraction(pdf_path: str, output_dir: str, max_pages: int = 10, 
-                             export_md: bool = False, export_csv: bool = False, force: bool = False, max_workers: int = 5) -> bool:
+                             export_md: bool = False, export_csv: bool = False, clean_text: bool = False, 
+                             force: bool = False, max_workers: int = 5) -> bool:
     """
     Run the complete PDF visual extraction pipeline
     
@@ -77,6 +79,7 @@ def run_pdf_visual_extraction(pdf_path: str, output_dir: str, max_pages: int = 1
         max_pages: Maximum number of pages to process
         export_md: Whether to export to Markdown
         export_csv: Whether to export tables to CSV format
+        clean_text: Whether to clean text to remove redundant table/figure content
         force: Whether to force reprocessing even if files exist
         max_workers: Maximum number of concurrent workers for VLM processing
         
@@ -216,7 +219,35 @@ def run_pdf_visual_extraction(pdf_path: str, output_dir: str, max_pages: int = 1
             print(f"✅ Table injection completed!")
             print(f"   Final result saved to: {final_output}")
         
-        # Step 5: Convert Tables to CSV (if requested)
+        # Step 5: Clean Text (remove redundant table/figure content)
+        if clean_text:
+            print("\n" + "="*60)
+            print("STEP: Text Cleaning")
+            print("="*60)
+            
+            if not os.getenv('OPENAI_API_KEY'):
+                print("⚠️  Skipping text cleaning (no OpenAI API key)")
+                print("   Set OPENAI_API_KEY to enable text cleaning")
+            else:
+                print("Cleaning text to remove redundant table/figure content...")
+                
+                # Initialize OpenAI client for text cleaning
+                from openai import OpenAI
+                client = OpenAI()
+                
+                # Clean the text
+                final_data = clean_text_in_data(final_data, client)
+                
+                # Save the cleaned result
+                with open(final_output, 'w', encoding='utf-8') as f:
+                    json.dump(final_data, f, indent=2, ensure_ascii=False)
+                
+                print(f"✅ Text cleaning completed!")
+                print(f"   Cleaned result saved to: {final_output}")
+        else:
+            print("\n⏭️  Skipping text cleaning (not requested)")
+        
+        # Step 6: Convert Tables to CSV (if requested)
         csv_results = None
         if export_csv:
             print("\n" + "="*60)
@@ -387,6 +418,11 @@ def create_summary_report(pdf_name: str, text_data: dict, visual_data: dict,
         f.write("3. ✅ OpenAI VLM Table/Figure Detection\n")
         f.write("4. ✅ Table Injection\n")
         step_num = 5
+        # Check if text cleaning was performed by looking for text_cleaned flags
+        text_cleaned = any(page.get('text_cleaned', False) for page in final_data.get('pages', []))
+        if text_cleaned:
+            f.write(f"{step_num}. ✅ Text Cleaning (LLM-powered)\n")
+            step_num += 1
         if csv_results is not None:
             f.write(f"{step_num}. ✅ Table CSV Conversion\n")
             step_num += 1
@@ -402,6 +438,7 @@ def main():
     parser.add_argument('--max_pages', type=int, default=10, help='Maximum pages to process')
     parser.add_argument('--export_md', action='store_true', help='Export to Markdown format')
     parser.add_argument('--export_csv', action='store_true', help='Export tables to CSV format (requires OpenAI API key)')
+    parser.add_argument('--clean_text', action='store_true', help='Clean text to remove redundant table/figure content (requires OpenAI API key)')
     parser.add_argument('--force', action='store_true', help='Force reprocessing even if output files exist')
     parser.add_argument('--max_workers', type=int, default=5, help='Maximum concurrent workers for VLM processing')
     
@@ -424,6 +461,7 @@ def main():
         args.max_pages,
         args.export_md,
         args.export_csv,
+        args.clean_text,
         args.force,
         args.max_workers
     )

@@ -20,6 +20,7 @@ from .openai_vlm_detector import detect_tables_figures_openai, process_images_op
 from .simple_table_injector import inject_tables_into_text, extract_tables_from_visual
 from .json_to_markdown import convert_json_to_markdown
 from .table_csv_converter import convert_tables_to_csv
+from .text_cleaner import clean_text_in_data
 
 __all__ = [
     "extract_text_from_pdf",
@@ -30,4 +31,5 @@ __all__ = [
     "extract_tables_from_visual",
     "convert_json_to_markdown",
     "convert_tables_to_csv",
+    "clean_text_in_data",
 ]

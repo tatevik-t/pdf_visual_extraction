@@ -34,7 +34,7 @@ def get_pdf_files(data_dir: str) -> list:
 
 def run_pdf_processing(pdf_path: str, output_dir: str, max_pages: int = None, 
                       export_md: bool = True, export_csv: bool = True, 
-                      max_workers: int = 3) -> dict:
+                      clean_text: bool = True, max_workers: int = 3) -> dict:
     """Run PDF visual extraction pipeline for a single PDF"""
     
     pdf_name = Path(pdf_path).stem
@@ -63,6 +63,8 @@ def run_pdf_processing(pdf_path: str, output_dir: str, max_pages: int = None,
             cmd.append("--export_md")
         if export_csv:
             cmd.append("--export_csv")
+        if clean_text:
+            cmd.append("--clean_text")
         
         # Add force flag to reprocess
         cmd.append("--force")
@@ -242,7 +244,7 @@ def generate_batch_summary(results: list, output_dir: str) -> None:
     print(f"\n📋 Batch processing summary saved to: {summary_file}")
 
 def main():
-    parser = argparse.ArgumentParser(description='Batch process all PDFs with CSV export')
+    parser = argparse.ArgumentParser(description='Batch process all PDFs with CSV export and text cleaning')
     parser.add_argument('--data_dir', default='data', help='Directory containing PDF files')
     parser.add_argument('--output_dir', default='batch_output', help='Output directory for all results')
     parser.add_argument('--max_pages', type=int, default=None, help='Maximum pages to process per PDF (default: all pages)')
@@ -250,6 +252,7 @@ def main():
     parser.add_argument('--parallel_jobs', type=int, default=2, help='Number of PDFs to process in parallel')
     parser.add_argument('--export_md', action='store_true', default=True, help='Export to Markdown format')
     parser.add_argument('--export_csv', action='store_true', default=True, help='Export tables to CSV format')
+    parser.add_argument('--clean_text', action='store_true', help='Clean text to remove redundant table/figure content')
     parser.add_argument('--skip_existing', action='store_true', help='Skip PDFs that already have output directories')
     
     args = parser.parse_args()
@@ -274,6 +277,7 @@ def main():
     print(f"🔄 Parallel PDF jobs: {args.parallel_jobs}")
     print(f"📝 Export Markdown: {args.export_md}")
     print(f"📈 Export CSV: {args.export_csv}")
+    print(f"🧹 Clean Text: {args.clean_text}")
     
     # Create output directory
     os.makedirs(args.output_dir, exist_ok=True)
@@ -308,6 +312,7 @@ def main():
                 args.max_pages,
                 args.export_md,
                 args.export_csv,
+                args.clean_text,
                 args.max_workers
             )
             future_to_pdf[future] = pdf_path
