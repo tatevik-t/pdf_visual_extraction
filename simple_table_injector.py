@@ -24,8 +24,9 @@ def extract_tables_from_visual(visual_data: Dict[str, Any]) -> Dict[int, List[Di
         
         page_tables = []
         for element in elements:
-            if element.get('type') == 'table':
+            if element.get('type') in ['table', 'figure']:
                 table_data = {
+                    "type": element.get('type', 'unknown'),
                     "description": element.get('description', ''),
                     "structured_data": element.get('content', {}).get('structured_data', ''),
                     "raw_text": element.get('content', {}).get('raw_text', ''),
@@ -35,7 +36,8 @@ def extract_tables_from_visual(visual_data: Dict[str, Any]) -> Dict[int, List[Di
                 page_tables.append(table_data)
         
         if page_tables:
-            tables_by_page[page_number] = page_tables
+            # Convert 0-based page numbers to 1-based to match text extraction
+            tables_by_page[page_number + 1] = page_tables
     
     return tables_by_page
 

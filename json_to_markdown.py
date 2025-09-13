@@ -24,20 +24,16 @@ def format_table_data(table: Dict[str, Any]) -> str:
     
     # Add structured data
     if table.get('structured_data'):
-        markdown.append(table['structured_data'])
+        structured_data = table['structured_data']
+        if isinstance(structured_data, dict):
+            # Handle dictionary structured data
+            for key, value in structured_data.items():
+                markdown.append(f"**{key}**: {value}")
+        else:
+            # Handle string structured data
+            markdown.append(str(structured_data))
         markdown.append("")
     
-    # Add raw text if available
-    if table.get('raw_text'):
-        markdown.append("**Raw Data:**")
-        markdown.append("```")
-        markdown.append(table['raw_text'])
-        markdown.append("```")
-        markdown.append("")
-    
-    # Add metadata
-    markdown.append(f"*Confidence: {table.get('confidence', 'N/A')}*")
-    markdown.append("")
     
     return "\n".join(markdown)
 
@@ -63,7 +59,7 @@ def convert_json_to_markdown(json_data: Dict[str, Any]) -> str:
         tables = page.get('tables', [])
         
         # Add page header
-        markdown.append(f"## Page {page_number + 1}")
+        markdown.append(f"## Page {page_number}")
         markdown.append("")
         
         # Add text content
@@ -73,12 +69,16 @@ def convert_json_to_markdown(json_data: Dict[str, Any]) -> str:
             markdown.append(text.strip())
             markdown.append("")
         
-        # Add tables
+        # Add tables and figures
         if tables:
             markdown.append("### Tables and Figures")
             markdown.append("")
             for i, table in enumerate(tables, 1):
-                markdown.append(f"#### Table {i}")
+                element_type = table.get('type', 'table')
+                if element_type == 'figure':
+                    markdown.append(f"#### Figure {i}")
+                else:
+                    markdown.append(f"#### Table {i}")
                 markdown.append("")
                 markdown.append(format_table_data(table))
         
