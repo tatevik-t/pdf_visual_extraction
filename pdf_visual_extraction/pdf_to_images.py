@@ -8,11 +8,11 @@ import pdf2image
 import argparse
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 
 def convert_pdf_to_images(
-    pdf_path: str, output_dir: str, dpi: int = 300, max_pages: int | None = None
+    pdf_path: str, output_dir: str, dpi: int = 300, max_pages: Optional[int] = None
 ) -> List[str]:
     """
     Convert PDF pages to images
