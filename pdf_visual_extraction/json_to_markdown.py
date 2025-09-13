@@ -29,18 +29,6 @@ def format_table_data(table: Dict[str, Any]) -> str:
         markdown.append(table["structured_data"])
         markdown.append("")
 
-    # Add raw text if available
-    if table.get("raw_text"):
-        markdown.append("**Raw Data:**")
-        markdown.append("```")
-        markdown.append(table["raw_text"])
-        markdown.append("```")
-        markdown.append("")
-
-    # Add metadata
-    markdown.append(f"*Confidence: {table.get('confidence', 'N/A')}*")
-    markdown.append("")
-
     return "\n".join(markdown)
 
 
